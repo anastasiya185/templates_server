@@ -2,7 +2,7 @@ package restclient
 
 import (
 	"fmt"
-	"module/staticfile"
+	"github.com/dbeast-co/nastya.git/staticfile"
 )
 
 func FillTemplateByName(templateName string, inputData map[string]interface{}) (interface{}, error) {

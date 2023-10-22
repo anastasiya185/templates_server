@@ -1,7 +1,8 @@
 package controllers
 
 import (
-	"module/restclient"
+	"bytes"
+	"github.com/dbeast-co/nastya.git/restclient"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -28,15 +29,14 @@ func LoadAllTemplates(c *gin.Context) {
 }
 
 type TemplatesVars struct {
-	Host     string `json:"host"`
-	Username string `json:"username"`
-	Password string `json:"password"`
-
-	//"url": "",
-	//"basicAuthUser": "",
-	//"secureJsonData": {
-	//"basicAuthPassword": ""
-	//},
+	Host           string `json:"host"`
+	Username       string `json:"username"`
+	Password       string `json:"password"`
+	Url            string `json:"url"`
+	BasicAuthUser  string `json:"basicAuthUser"`
+	SecureJsonData struct {
+		BasicAuthPassword string `json:"basicAuthPassword"`
+	} `json:"secureJsonData"`
 }
 
 func Test(c *gin.Context) {
@@ -71,13 +71,33 @@ func UpdateTemplate(c *gin.Context) {
 }
 
 func SendTemplate(c *gin.Context) {
-	templateName := c.Param("name")
+	UpdateTemplate(c)
 
-	template, err := restclient.FillTemplateByName(templateName, nil)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load template"})
+	updatedTemplate, ok := c.Get("updatedTemplate")
+	if !ok {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get updated template"})
 		return
 	}
 
-	c.JSON(http.StatusOK, template)
+	updatedTemplateBytes, ok := updatedTemplate.([]byte)
+	if !ok {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Updated template is not in the expected format"})
+		return
+	}
+
+	targetURL := "http://localhost:8081"
+
+	resp, err := http.Post(targetURL, "application/json", bytes.NewBuffer(updatedTemplateBytes))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to send updated template to target host"})
+		return
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Target host returned an error"})
+		return
+	}
+
+	c.JSON(http.StatusOK, updatedTemplate)
 }

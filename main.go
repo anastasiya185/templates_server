@@ -1,11 +1,12 @@
 package main
 
 import (
-	"module/restServer"
-	"module/staticfile"
+	"github.com/dbeast-co/nastya.git/restServer"
+	"github.com/dbeast-co/nastya.git/staticfile"
 )
 
 func main() {
+
 	FOLDER_PATH := "templates"
 	staticfile.LoadTemplatesFromFolder(FOLDER_PATH)
 

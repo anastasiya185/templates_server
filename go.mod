@@ -1,4 +1,5 @@
-module module
+module github.com/dbeast-co/nastya.git
+
 
 go 1.21.1
 
