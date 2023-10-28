@@ -1,12 +1,16 @@
 package controllers
 
 import (
-	"bytes"
+	"encoding/json"
 	"github.com/dbeast-co/nastya.git/restclient"
-	"net/http"
-
+	"github.com/dbeast-co/nastya.git/staticfile"
 	"github.com/gin-gonic/gin"
+	"log"
+	"net/http"
+	"strings"
 )
+
+var UpdatedTemplates = make(map[string]interface{})
 
 func LoadTemplateByName(c *gin.Context) {
 	templateName := c.Param("name")
@@ -18,6 +22,7 @@ func LoadTemplateByName(c *gin.Context) {
 
 	c.JSON(http.StatusOK, template)
 }
+
 func LoadAllTemplates(c *gin.Context) {
 	template, err := restclient.FillAllTemplates(nil)
 	if err != nil {
@@ -28,7 +33,7 @@ func LoadAllTemplates(c *gin.Context) {
 	c.JSON(http.StatusOK, template)
 }
 
-type TemplatesVars struct {
+type TemplateData struct {
 	Host           string `json:"host"`
 	Username       string `json:"username"`
 	Password       string `json:"password"`
@@ -40,7 +45,7 @@ type TemplatesVars struct {
 }
 
 func Test(c *gin.Context) {
-	var template TemplatesVars
+	var template TemplateData
 
 	if err := c.BindJSON(&template); err != nil {
 		return
@@ -48,56 +53,82 @@ func Test(c *gin.Context) {
 	c.IndentedJSON(http.StatusCreated, template)
 }
 
-func UpdateTemplate(c *gin.Context) {
-
-	templateName := c.Param("id")
-
-	var fillRequest struct {
-		InputData map[string]interface{} `json:"input_data"`
-	}
-
-	if err := c.ShouldBindJSON(&fillRequest); err != nil {
+func UpdateTemplates(c *gin.Context) {
+	var dataToUpdate TemplateData
+	if err := c.ShouldBindJSON(&dataToUpdate); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request payload"})
 		return
 	}
 
-	template, err := restclient.FillTemplateByName(templateName, fillRequest.InputData)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update template"})
-		return
+	for name, data := range staticfile.TemplatesMap {
+		updatedData := cloneTemplate(data)
+		if strings.HasPrefix(name, "elasticsearch_datasource") {
+			updatedData.(map[string]interface{})["Host"] = dataToUpdate.Host
+			updatedData.(map[string]interface{})["Username"] = dataToUpdate.Username
+			updatedData.(map[string]interface{})["Password"] = dataToUpdate.Password
+		}
+		//else if strings.HasPrefix(name, "json_api_datasource") {
+		//	updatedData.(map[string]interface{})["Url"] = dataToUpdate.Url
+		//	updatedData.(map[string]interface{})["BasicAuthUser"] = dataToUpdate.BasicAuthUser
+		//	updatedData.(map[string]interface{})["SecureJsonData"].(map[string]interface{})["BasicAuthPassword"] = dataToUpdate.SecureJsonData.BasicAuthPassword
+		//}
+		UpdatedTemplates[name] = updatedData
 	}
+	sendUpdatedTemplates(c)
 
-	c.JSON(http.StatusOK, template)
+	c.JSON(http.StatusOK, UpdatedTemplates)
 }
 
-func SendTemplate(c *gin.Context) {
-	UpdateTemplate(c)
-
-	updatedTemplate, ok := c.Get("updatedTemplate")
-	if !ok {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get updated template"})
-		return
-	}
-
-	updatedTemplateBytes, ok := updatedTemplate.([]byte)
-	if !ok {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Updated template is not in the expected format"})
-		return
-	}
-
-	targetURL := "http://localhost:8081"
-
-	resp, err := http.Post(targetURL, "application/json", bytes.NewBuffer(updatedTemplateBytes))
+func cloneTemplate(data interface{}) interface{} {
+	dataBytes, err := json.Marshal(data)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to send updated template to target host"})
-		return
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Target host returned an error"})
-		return
+		log.Printf("Failed to marshal data: %v", err)
+		return data
 	}
 
-	c.JSON(http.StatusOK, updatedTemplate)
+	var clonedTemplate interface{}
+	if err := json.Unmarshal(dataBytes, &clonedTemplate); err != nil {
+		log.Printf("Failed to unmarshal cloned data: %v", err)
+		return data
+	}
+
+	return clonedTemplate
+}
+
+//func sendUpdatedTemplates(c *gin.Context) {
+//	for _, template := range UpdatedTemplates {
+//		tmp := fmt.Sprintf("%+v", template)
+//		log.Println(tmp)
+//		templateMap, ok := template.(map[string]interface{})
+//		if !ok {
+//			continue
+//		}
+//
+//		_, hasUsername := templateMap["username"]
+//		_, hasPassword := templateMap["password"]
+//
+//		if hasUsername && hasPassword {
+//			templateJSON, err := json.Marshal(template)
+//			if err != nil {
+//				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to marshal updated template"})
+//				return
+//			}
+//			c.JSON(http.StatusOK, templateJSON)
+//		}
+//	}
+//}
+
+func sendUpdatedTemplates(c *gin.Context) {
+	for _, template := range UpdatedTemplates {
+		templateJSON, err := json.Marshal(template)
+		if err != nil {
+			log.Printf("Failed to marshal template: %v", err)
+			continue
+		}
+		c.JSON(http.StatusOK, templateJSON)
+	}
+}
+
+func TestTemplate(c *gin.Context) {
+	c.JSON(http.StatusOK, UpdatedTemplates)
 }
