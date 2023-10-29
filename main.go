@@ -11,6 +11,5 @@ func main() {
 	staticfile.LoadTemplatesFromFolder(FOLDER_PATH)
 
 	restServer.StartServer()
-	//restclient.SendTemplate()
 
 }

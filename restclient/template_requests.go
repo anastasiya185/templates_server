@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/dbeast-co/nastya.git/staticfile"
-	"io"
 	"net/http"
 )
 
@@ -27,13 +26,15 @@ func FillAllTemplates(inputData map[string]interface{}) (interface{}, error) {
 	return staticfile.TemplatesMap, nil
 }
 
-func SendTemplate() {
+func SendTemplate(Templates map[string]interface{}) {
+
 	httpposturl := "http://localhost:8080"
 	fmt.Println("HTTP JSON POST URL:", httpposturl)
 	client := &http.Client{}
 
-	for name, template := range staticfile.TemplatesMap {
+	for name, template := range Templates {
 		requestBody, err := json.Marshal(template)
+
 		if err != nil {
 			fmt.Printf("Failed to marshal template %s: %v\n", name, err)
 			continue
@@ -53,15 +54,13 @@ func SendTemplate() {
 		}
 		defer response.Body.Close()
 
-		fmt.Println("Template Name:", name)
 		fmt.Println("response Status:", response.Status)
-		fmt.Println("response Headers:", response.Header)
 
-		body, err := io.ReadAll(response.Body)
-		if err != nil {
-			fmt.Printf("Failed to read response body for template %s: %v\n", name, err)
-			continue
-		}
-		fmt.Println("response Body:", string(body))
+		//	body, err := io.ReadAll(response.Body)
+		//	if err != nil {
+		//		fmt.Printf("Failed to read response body for template %s: %v\n", name, err)
+		//		continue
+		//	}
+		//	fmt.Println("response Body:", string(body))
 	}
 }

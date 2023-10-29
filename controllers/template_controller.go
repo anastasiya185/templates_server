@@ -2,15 +2,15 @@ package controllers
 
 import (
 	"encoding/json"
+	"fmt"
 	"github.com/dbeast-co/nastya.git/restclient"
 	"github.com/dbeast-co/nastya.git/staticfile"
 	"github.com/gin-gonic/gin"
+	"io"
 	"log"
 	"net/http"
 	"strings"
 )
-
-var UpdatedTemplates = make(map[string]interface{})
 
 func LoadTemplateByName(c *gin.Context) {
 	templateName := c.Param("name")
@@ -33,49 +33,94 @@ func LoadAllTemplates(c *gin.Context) {
 	c.JSON(http.StatusOK, template)
 }
 
-type TemplateData struct {
-	Host           string `json:"host"`
-	Username       string `json:"username"`
-	Password       string `json:"password"`
-	Url            string `json:"url"`
-	BasicAuthUser  string `json:"basicAuthUser"`
-	SecureJsonData struct {
-		BasicAuthPassword string `json:"basicAuthPassword"`
-	} `json:"secureJsonData"`
+type StructToUpdateTemplates struct {
+	Prod struct {
+		Elasticsearch struct {
+			Host                  string `json:"host"`
+			AuthenticationEnabled bool   `json:"authentication_enabled"`
+			Username              string `json:"username"`
+			Password              string `json:"password"`
+			Status                string `json:"status"`
+		} `json:"elasticsearch"`
+		Kibana struct {
+			Host                  string `json:"host"`
+			AuthenticationEnabled bool   `json:"authentication_enabled"`
+			Username              string `json:"username"`
+			Password              string `json:"password"`
+			Status                string `json:"status"`
+		} `json:"kibana"`
+	} `json:"prod"`
+	Mon struct {
+		Elasticsearch struct {
+			Host                  string `json:"host"`
+			AuthenticationEnabled bool   `json:"authentication_enabled"`
+			Username              string `json:"username"`
+			Password              string `json:"password"`
+			Status                string `json:"status"`
+		} `json:"elasticsearch"`
+	} `json:"mon"`
 }
 
 func Test(c *gin.Context) {
-	var template TemplateData
+	var StructData StructToUpdateTemplates
 
-	if err := c.BindJSON(&template); err != nil {
+	if err := c.BindJSON(&StructData); err != nil {
 		return
 	}
-	c.IndentedJSON(http.StatusCreated, template)
+	c.IndentedJSON(http.StatusCreated, StructData)
 }
 
 func UpdateTemplates(c *gin.Context) {
-	var dataToUpdate TemplateData
+	var dataToUpdate StructToUpdateTemplates
 	if err := c.ShouldBindJSON(&dataToUpdate); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request payload"})
 		return
 	}
 
-	for name, data := range staticfile.TemplatesMap {
-		updatedData := cloneTemplate(data)
+	var UpdatedTemplates = make(map[string]interface{})
+	for name, template := range staticfile.TemplatesMap {
+		clonedTemplates := cloneTemplate(template)
+
 		if strings.HasPrefix(name, "elasticsearch_datasource") {
-			updatedData.(map[string]interface{})["Host"] = dataToUpdate.Host
-			updatedData.(map[string]interface{})["Username"] = dataToUpdate.Username
-			updatedData.(map[string]interface{})["Password"] = dataToUpdate.Password
+			if OneClonedTemplate, ok := clonedTemplates.(map[string]interface{}); ok {
+
+				if database, ok := OneClonedTemplate["database"].(string); ok {
+					database = strings.Replace(database, "*", "", -1)
+
+					if name, ok := OneClonedTemplate["name"].(string); ok {
+						OneClonedTemplate["name"] = name + "-" + database
+					}
+
+					if uid, ok := OneClonedTemplate["uid"].(string); ok {
+						OneClonedTemplate["uid"] = uid + "-" + database
+					}
+
+					OneClonedTemplate["url"] = dataToUpdate.Mon.Elasticsearch.Host
+					OneClonedTemplate["basicAuth"] = dataToUpdate.Mon.Elasticsearch.AuthenticationEnabled
+
+					if OneClonedTemplate["basicAuth"] == true {
+						OneClonedTemplate["basicAuthUser"] = dataToUpdate.Mon.Elasticsearch.Username
+						OneClonedTemplate["secureJsonData"].(map[string]interface{})["basicAuthPassword"] = dataToUpdate.Mon.Elasticsearch.Password
+					}
+
+					if url, ok := OneClonedTemplate["url"].(string); ok {
+						if strings.Contains(url, "https") {
+							OneClonedTemplate["jsonData"].(map[string]interface{})["tlsSkipVerify"] = true
+						}
+					}
+				}
+			}
 		}
+
 		//else if strings.HasPrefix(name, "json_api_datasource") {
 		//	updatedData.(map[string]interface{})["Url"] = dataToUpdate.Url
 		//	updatedData.(map[string]interface{})["BasicAuthUser"] = dataToUpdate.BasicAuthUser
 		//	updatedData.(map[string]interface{})["SecureJsonData"].(map[string]interface{})["BasicAuthPassword"] = dataToUpdate.SecureJsonData.BasicAuthPassword
 		//}
-		UpdatedTemplates[name] = updatedData
+		UpdatedTemplates[name] = clonedTemplates
 	}
-	sendUpdatedTemplates(c)
-
+	//sendUpdatedTemplates(c)
+	restclient.SendTemplate(UpdatedTemplates)
 	c.JSON(http.StatusOK, UpdatedTemplates)
 }
 
@@ -118,17 +163,23 @@ func cloneTemplate(data interface{}) interface{} {
 //	}
 //}
 
-func sendUpdatedTemplates(c *gin.Context) {
-	for _, template := range UpdatedTemplates {
-		templateJSON, err := json.Marshal(template)
-		if err != nil {
-			log.Printf("Failed to marshal template: %v", err)
-			continue
-		}
-		c.JSON(http.StatusOK, templateJSON)
-	}
-}
+//func sendUpdatedTemplates(c *gin.Context) {
+//	for _, template := range UpdatedTemplates {
+//		templateJSON, err := json.Marshal(template)
+//		if err != nil {
+//			log.Printf("Failed to marshal template: %v", err)
+//			continue
+//		}
+//		c.JSON(http.StatusOK, templateJSON)
+//	}
+//}
 
 func TestTemplate(c *gin.Context) {
-	c.JSON(http.StatusOK, UpdatedTemplates)
+
+	body, err := io.ReadAll(c.Request.Body)
+	if err != nil {
+		fmt.Printf("Failed to read request body for template", err)
+	} else {
+		fmt.Println("response Body:", string(body))
+	}
 }
