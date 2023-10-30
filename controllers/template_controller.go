@@ -81,6 +81,7 @@ func UpdateTemplates(c *gin.Context) {
 	for name, template := range staticfile.TemplatesMap {
 		clonedTemplates := cloneTemplate(template)
 
+		//FOR THE ELASTICSEARCH DATASOURCE
 		if strings.HasPrefix(name, "elasticsearch_datasource") {
 			if OneClonedTemplate, ok := clonedTemplates.(map[string]interface{}); ok {
 
@@ -112,11 +113,75 @@ func UpdateTemplates(c *gin.Context) {
 			}
 		}
 
-		//else if strings.HasPrefix(name, "json_api_datasource") {
-		//	updatedData.(map[string]interface{})["Url"] = dataToUpdate.Url
-		//	updatedData.(map[string]interface{})["BasicAuthUser"] = dataToUpdate.BasicAuthUser
-		//	updatedData.(map[string]interface{})["SecureJsonData"].(map[string]interface{})["BasicAuthPassword"] = dataToUpdate.SecureJsonData.BasicAuthPassword
-		//}
+		//FOR THE JSON API (ELASTICSEARCH_MON)
+		if strings.HasPrefix(name, "json_api_datasource_elasticsearch_mon") {
+			if OneClonedTemplate, ok := clonedTemplates.(map[string]interface{}); ok {
+
+				OneClonedTemplate["name"] = name + "-"
+				OneClonedTemplate["uid"] = name + "-"
+
+				OneClonedTemplate["url"] = dataToUpdate.Mon.Elasticsearch.Host
+				OneClonedTemplate["basicAuth"] = dataToUpdate.Mon.Elasticsearch.AuthenticationEnabled
+
+				if OneClonedTemplate["basicAuth"] == true {
+					OneClonedTemplate["basicAuthUser"] = dataToUpdate.Mon.Elasticsearch.Username
+					OneClonedTemplate["secureJsonData"].(map[string]interface{})["basicAuthPassword"] = dataToUpdate.Mon.Elasticsearch.Password
+				}
+
+				if url, ok := OneClonedTemplate["url"].(string); ok {
+					if strings.Contains(url, "https") {
+						OneClonedTemplate["jsonData"].(map[string]interface{})["tlsSkipVerify"] = true
+					}
+				}
+			}
+		}
+
+		//FOR THE JSON API (ELASTICSEARCH_PROD)
+		if strings.HasPrefix(name, "json_api_datasource_elasticsearch_prod") {
+			if OneClonedTemplate, ok := clonedTemplates.(map[string]interface{}); ok {
+
+				OneClonedTemplate["name"] = name + "-"
+				OneClonedTemplate["uid"] = name + "-"
+
+				OneClonedTemplate["url"] = dataToUpdate.Prod.Elasticsearch.Host
+				OneClonedTemplate["basicAuth"] = dataToUpdate.Prod.Elasticsearch.AuthenticationEnabled
+
+				if OneClonedTemplate["basicAuth"] == true {
+					OneClonedTemplate["basicAuthUser"] = dataToUpdate.Prod.Elasticsearch.Username
+					OneClonedTemplate["secureJsonData"].(map[string]interface{})["basicAuthPassword"] = dataToUpdate.Prod.Elasticsearch.Password
+				}
+
+				if url, ok := OneClonedTemplate["url"].(string); ok {
+					if strings.Contains(url, "https") {
+						OneClonedTemplate["jsonData"].(map[string]interface{})["tlsSkipVerify"] = true
+					}
+				}
+			}
+		}
+
+		//FOR THE JSON API (KIBANA)
+		if strings.HasPrefix(name, "json_api_datasource_kibana") {
+			if OneClonedTemplate, ok := clonedTemplates.(map[string]interface{}); ok {
+
+				OneClonedTemplate["name"] = name + "-"
+				OneClonedTemplate["uid"] = name + "-"
+
+				OneClonedTemplate["url"] = dataToUpdate.Prod.Kibana.Host
+				OneClonedTemplate["basicAuth"] = dataToUpdate.Prod.Kibana.AuthenticationEnabled
+
+				if OneClonedTemplate["basicAuth"] == true {
+					OneClonedTemplate["basicAuthUser"] = dataToUpdate.Prod.Kibana.Username
+					OneClonedTemplate["secureJsonData"].(map[string]interface{})["basicAuthPassword"] = dataToUpdate.Prod.Kibana.Password
+				}
+
+				if url, ok := OneClonedTemplate["url"].(string); ok {
+					if strings.Contains(url, "https") {
+						OneClonedTemplate["jsonData"].(map[string]interface{})["tlsSkipVerify"] = true
+					}
+				}
+			}
+		}
+
 		UpdatedTemplates[name] = clonedTemplates
 	}
 	//sendUpdatedTemplates(c)
