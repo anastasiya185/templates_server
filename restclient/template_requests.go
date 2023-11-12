@@ -43,7 +43,6 @@ func SendTemplate(Templates map[string]interface{}) {
 	}
 }
 
-// todo make dao here
 func GetStatus(dataToUpdate staticfile.Credentials) (string, error) {
 	if dataToUpdate.Host == "" {
 		return "", fmt.Errorf("Host is empty")
