@@ -2,13 +2,12 @@ package restclient
 
 import (
 	"bytes"
-	"crypto/tls"
 	"encoding/json"
 	"fmt"
+	"github.com/dbeast-co/nastya.git/dao"
 	"github.com/dbeast-co/nastya.git/staticfile"
 	"io"
 	"net/http"
-	"strings"
 )
 
 func SendTemplate(Templates map[string]interface{}) {
@@ -44,17 +43,11 @@ func SendTemplate(Templates map[string]interface{}) {
 }
 
 func GetStatus(dataToUpdate staticfile.Credentials) (string, error) {
-	if dataToUpdate.Host == "" {
-		return "", fmt.Errorf("Host is empty")
-	}
 
-	var tr *http.Transport
-	if strings.HasPrefix(dataToUpdate.Host, "https://") {
-		tr = &http.Transport{
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-		}
+	client, err := dao.CreateHTTPClient(dataToUpdate)
+	if err != nil {
+		return "", err
 	}
-	client := &http.Client{Transport: tr}
 
 	requestURL := dataToUpdate.Host + "/_cluster/health"
 	req, err := http.NewRequest("GET", requestURL, nil)
