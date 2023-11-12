@@ -2,29 +2,14 @@ package restclient
 
 import (
 	"bytes"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"github.com/dbeast-co/nastya.git/staticfile"
+	"io"
 	"net/http"
+	"strings"
 )
-
-func FillTemplateByName(templateName string, inputData map[string]interface{}) (interface{}, error) {
-	template, ok := staticfile.TemplatesMap[templateName]
-	if !ok {
-		return nil, fmt.Errorf("template with name %s not found", templateName)
-	}
-
-	for key, val := range inputData {
-		template.(map[string]interface{})[key] = val
-	}
-
-	return template, nil
-}
-
-func FillAllTemplates(inputData map[string]interface{}) (interface{}, error) {
-
-	return staticfile.TemplatesMap, nil
-}
 
 func SendTemplate(Templates map[string]interface{}) {
 
@@ -55,12 +40,45 @@ func SendTemplate(Templates map[string]interface{}) {
 		defer response.Body.Close()
 
 		fmt.Println("response Status:", response.Status)
+	}
+}
 
-		//	body, err := io.ReadAll(response.Body)
-		//	if err != nil {
-		//		fmt.Printf("Failed to read response body for template %s: %v\n", name, err)
-		//		continue
-		//	}
-		//	fmt.Println("response Body:", string(body))
+func GetStatus(dataToUpdate staticfile.Credentials) (string, error) {
+	if dataToUpdate.Host == "" {
+		return "", fmt.Errorf("Host is empty")
+	}
+
+	var tr *http.Transport
+	if strings.HasPrefix(dataToUpdate.Host, "https://") {
+		tr = &http.Transport{
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		}
+	}
+	client := &http.Client{Transport: tr}
+
+	requestURL := dataToUpdate.Host + "/_cluster/health"
+	req, err := http.NewRequest("GET", requestURL, nil)
+	if err != nil {
+		return "", err
+	}
+	if dataToUpdate.AuthenticationEnabled == true {
+		req.SetBasicAuth(dataToUpdate.Username, dataToUpdate.Password)
+	}
+
+	response, err := client.Do(req)
+	if err != nil {
+		fmt.Println("Error making HTTP request:", err)
+		return "", err
+	}
+	defer response.Body.Close()
+
+	if response.StatusCode == http.StatusOK {
+		body, err := io.ReadAll(response.Body)
+		if err != nil {
+			return "", err
+		}
+		return string(body), nil
+	} else {
+		return "", fmt.Errorf("Request failed with status: %d", response.StatusCode)
 	}
 }

@@ -12,92 +12,8 @@ import (
 	"strings"
 )
 
-type Credentials struct {
-	Host                  string `json:"host"`
-	AuthenticationEnabled bool   `json:"authentication_enabled"`
-	Username              string `json:"username"`
-	Password              string `json:"password"`
-	Status                string `json:"status"`
-}
-type StructToUpdateTemplates struct {
-	Prod struct {
-		Elasticsearch Credentials `json:"elasticsearch"`
-		Kibana        Credentials `json:"kibana"`
-	} `json:"prod"`
-	Mon struct {
-		Elasticsearch Credentials `json:"elasticsearch"`
-	} `json:"mon"`
-}
-
-func LoadTemplateByName(c *gin.Context) {
-	templateName := c.Param("name")
-	template, err := restclient.FillTemplateByName(templateName, nil)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load template"})
-		return
-	}
-
-	c.JSON(http.StatusOK, template)
-}
-
-func LoadAllTemplates(c *gin.Context) {
-	template, err := restclient.FillAllTemplates(nil)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load template"})
-		return
-	}
-
-	c.JSON(http.StatusOK, template)
-}
-
-func Test(c *gin.Context) {
-	var StructData StructToUpdateTemplates
-
-	if err := c.BindJSON(&StructData); err != nil {
-		return
-	}
-	c.IndentedJSON(http.StatusCreated, StructData)
-}
-
-//func TestCluster(c *gin.Context) {
-//	var dataToUpdate StructToUpdateTemplates
-//	if err := c.ShouldBindJSON(&dataToUpdate); err != nil {
-//		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request payload"})
-//		return
-//	}
-//
-//	//Do update Mon status
-//	doHTTPRequestViaClient(dataToUpdate.Mon.Elasticsearch, status)
-//	//Do update Prod status
-//	doHTTPRequestViaClient(dataToUpdate.Prod.Elasticsearch, status)
-//	//return
-//	{
-//		"prod": {
-//		"elasticsearch": {
-//			"status": "GREEN/YELLOW/RED/ERROR",
-//				"error": ""
-//		},
-//		"kibana": {
-//			"status": "GREEN/YELLOW/RED",
-//				"error": ""
-//		}
-//	},
-//		"mon": {
-//		"elasticsearch": {
-//			"status": "GREEN/YELLOW/RED",
-//				"error": ""
-//		}
-//	}
-//	}
-//}
-//
-//func doHTTPRequestViaClient(elasticsearch Credentials) {
-//	//Build client with provided credentials
-//	//Get data from API and update "status" in the original doc
-//}
-
 func UpdateTemplates(c *gin.Context) {
-	var dataToUpdate StructToUpdateTemplates
+	var dataToUpdate staticfile.StructToUpdateTemplates
 	if err := c.ShouldBindJSON(&dataToUpdate); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request payload"})
 		return
@@ -110,18 +26,20 @@ func UpdateTemplates(c *gin.Context) {
 		switch {
 		case strings.HasPrefix(name, "json_api_datasource_elasticsearch_mon"):
 			UpdateJsonTemplateValues(clonedTemplates, dataToUpdate.Mon.Elasticsearch)
+			break
 
 		case strings.HasPrefix(name, "json_api_datasource_elasticsearch_prod"):
 			UpdateJsonTemplateValues(clonedTemplates, dataToUpdate.Prod.Elasticsearch)
-
+			break
 		case strings.HasPrefix(name, "json_api_datasource_kibana"):
 			UpdateJsonTemplateValues(clonedTemplates, dataToUpdate.Prod.Kibana)
-
+			break
 		case strings.HasPrefix(name, "elasticsearch_datasource"):
 			UpdateElasticsearchTemplateValues(clonedTemplates, dataToUpdate.Mon.Elasticsearch)
-
+			break
 		default:
 		}
+		UpdatedTemplates[name] = clonedTemplates
 
 	}
 
@@ -129,7 +47,7 @@ func UpdateTemplates(c *gin.Context) {
 	c.JSON(http.StatusOK, UpdatedTemplates)
 }
 
-func UpdateJsonTemplateValues(clonedTemplates interface{}, dataToUpdate Credentials) {
+func UpdateJsonTemplateValues(clonedTemplates interface{}, dataToUpdate staticfile.Credentials) {
 	if OneClonedTemplate, ok := clonedTemplates.(map[string]interface{}); ok {
 
 		OneClonedTemplate["name"] = OneClonedTemplate["name"].(string) + "-"
@@ -151,7 +69,7 @@ func UpdateJsonTemplateValues(clonedTemplates interface{}, dataToUpdate Credenti
 	}
 }
 
-func UpdateElasticsearchTemplateValues(clonedTemplates interface{}, dataToUpdate Credentials) {
+func UpdateElasticsearchTemplateValues(clonedTemplates interface{}, dataToUpdate staticfile.Credentials) {
 	if OneClonedTemplate, ok := clonedTemplates.(map[string]interface{}); ok {
 
 		if database, ok := OneClonedTemplate["database"].(string); ok {
@@ -192,40 +110,6 @@ func CloneTemplate(data interface{}) interface{} {
 
 	return clonedTemplate
 }
-
-//func sendUpdatedTemplates(c *gin.Context) {
-//	for _, template := range UpdatedTemplates {
-//		tmp := fmt.Sprintf("%+v", template)
-//		log.Println(tmp)
-//		templateMap, ok := template.(map[string]interface{})
-//		if !ok {
-//			continue
-//		}
-//
-//		_, hasUsername := templateMap["username"]
-//		_, hasPassword := templateMap["password"]
-//
-//		if hasUsername && hasPassword {
-//			templateJSON, err := json.Marshal(template)
-//			if err != nil {
-//				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to marshal updated template"})
-//				return
-//			}
-//			c.JSON(http.StatusOK, templateJSON)
-//		}
-//	}
-//}
-
-//func sendUpdatedTemplates(c *gin.Context) {
-//	for _, template := range UpdatedTemplates {
-//		templateJSON, err := json.Marshal(template)
-//		if err != nil {
-//			log.Printf("Failed to marshal template: %v", err)
-//			continue
-//		}
-//		c.JSON(http.StatusOK, templateJSON)
-//	}
-//}
 
 func TestTemplate(c *gin.Context) {
 
