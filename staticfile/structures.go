@@ -7,7 +7,7 @@ type Credentials struct {
 	Password              string `json:"password"`
 	Status                string `json:"status"`
 }
-type StructToUpdateTemplates struct {
+type EnvironmentConfig struct {
 	Prod struct {
 		Elasticsearch Credentials `json:"elasticsearch"`
 		Kibana        Credentials `json:"kibana"`
