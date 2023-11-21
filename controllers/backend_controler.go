@@ -28,12 +28,12 @@ func TestCluster(c *gin.Context) {
 
 	statusData.Mon.Elasticsearch = UpdateStatusForType(&EnvironmentConfig.Mon.Elasticsearch)
 
-	statusDataJSON, err := json.Marshal(statusData)
+	statusDataJSON, err := json.MarshalIndent(statusData, "", "    ")
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to marshal status data"})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"statusData": statusDataJSON})
+	c.JSON(http.StatusOK, statusData)
 	fmt.Println("Status Data:", string(statusDataJSON))
 }
 
